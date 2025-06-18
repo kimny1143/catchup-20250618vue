@@ -5,6 +5,27 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <cmath>
+
+// 時間間隔を表す構造体
+struct TimeInterval {
+    int64_t start;  // 開始時刻（分単位のタイムスタンプ）
+    int64_t end;    // 終了時刻（分単位のタイムスタンプ）
+    std::string id; // スロットID
+    
+    TimeInterval(int64_t s, int64_t e, const std::string& i) : start(s), end(e), id(i) {}
+    
+    // 二つの間隔が重なるかチェック
+    bool overlaps(const TimeInterval& other) const {
+        return start < other.end && end > other.start;
+    }
+    
+    // 二つの間隔の最小距離を計算（分単位）
+    int64_t distanceTo(const TimeInterval& other) const {
+        if (overlaps(other)) return 0;
+        return std::min(std::abs(other.start - end), std::abs(start - other.end));
+    }
+};
 
 // analyzeSlot関数：スロットIDの文字列長を返す
 Napi::Number AnalyzeSlot(const Napi::CallbackInfo& info) {
@@ -33,7 +54,26 @@ int64_t parseTimeString(const std::string& timeStr) {
     return std::chrono::duration_cast<std::chrono::minutes>(tp.time_since_epoch()).count();
 }
 
-// checkConflict関数：予約時間の競合をチェック
+// isConflict関数：時間間隔の競合を高度にチェック
+bool isConflict(int64_t start, int64_t end, const std::vector<TimeInterval>& intervals, int64_t minGapMinutes = 60) {
+    TimeInterval newInterval(start, end, "new");
+    
+    for (const auto& interval : intervals) {
+        // 重なりチェック
+        if (newInterval.overlaps(interval)) {
+            return true;
+        }
+        
+        // 最小間隔チェック
+        if (newInterval.distanceTo(interval) < minGapMinutes) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+// checkConflict関数：予約時間の競合をチェック（改良版）
 Napi::Boolean CheckConflict(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     
@@ -46,27 +86,32 @@ Napi::Boolean CheckConflict(const Napi::CallbackInfo& info) {
     Napi::Array slotsArray = info[0].As<Napi::Array>();
     std::string newTime = info[1].As<Napi::String>().Utf8Value();
     
-    // 新しい予約時間のタイムスタンプ
-    int64_t newTimeStamp = parseTimeString(newTime);
+    // 新しい予約の時間間隔（デフォルトで60分のセッション）
+    int64_t newStart = parseTimeString(newTime);
+    int64_t newEnd = newStart + 60;  // 60分のセッション
     
-    // 既存のスロットをチェック
+    // 既存の予約済み間隔を収集
+    std::vector<TimeInterval> reservedIntervals;
+    
     for (uint32_t i = 0; i < slotsArray.Length(); i++) {
         Napi::Object slot = slotsArray.Get(i).As<Napi::Object>();
         
-        // 予約済みのスロットのみチェック
+        // 予約済みのスロットのみ処理
         bool reserved = slot.Get("reserved").As<Napi::Boolean>().Value();
         if (reserved) {
             std::string existingTime = slot.Get("time").As<Napi::String>().Utf8Value();
-            int64_t existingTimeStamp = parseTimeString(existingTime);
+            std::string slotId = slot.Get("id").As<Napi::String>().Utf8Value();
+            int64_t existingStart = parseTimeString(existingTime);
+            int64_t existingEnd = existingStart + 60;  // 60分のセッション
             
-            // 時間の差が60分未満の場合は競合
-            if (std::abs(newTimeStamp - existingTimeStamp) < 60) {
-                return Napi::Boolean::New(env, true);  // 競合あり
-            }
+            reservedIntervals.emplace_back(existingStart, existingEnd, slotId);
         }
     }
     
-    return Napi::Boolean::New(env, false);  // 競合なし
+    // 競合チェック（最小間隔60分）
+    bool hasConflict = isConflict(newStart, newEnd, reservedIntervals, 60);
+    
+    return Napi::Boolean::New(env, hasConflict);
 }
 
 // calculateOptimalSlot関数：最適な予約スロットを計算（高度な処理のデモ）

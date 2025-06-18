@@ -1,0 +1,150 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 8
+    
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'pnpm'
+    
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+    
+    - name: Build C++ addon
+      run: pnpm --filter addon build
+    
+    - name: Build all packages
+      run: pnpm build
+    
+    - name: Start servers for E2E tests
+      env:
+        PORT: 4000
+        VITE_PORT: 3000
+        NODE_ENV: test
+      run: |
+        # バックエンドサーバーを起動
+        pnpm --filter backend dev &
+        BACKEND_PID=$!
+        
+        # フロントエンドサーバーを起動
+        pnpm --filter frontend dev &
+        FRONTEND_PID=$!
+        
+        # サーバーの起動を待つ
+        echo "Waiting for servers to start..."
+        npx wait-on http://localhost:4000/api/slots http://localhost:3000 -t 30000
+        
+        # PIDを保存（後でクリーンアップ用）
+        echo $BACKEND_PID > backend.pid
+        echo $FRONTEND_PID > frontend.pid
+    
+    - name: Run E2E tests
+      env:
+        CYPRESS_baseUrl: http://localhost:3000
+      run: pnpm test:e2e
+    
+    - name: Stop servers
+      if: always()
+      run: |
+        # サーバーを停止
+        if [ -f backend.pid ]; then
+          kill $(cat backend.pid) || true
+          rm backend.pid
+        fi
+        if [ -f frontend.pid ]; then
+          kill $(cat frontend.pid) || true
+          rm frontend.pid
+        fi
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: cypress-results-${{ matrix.node-version }}
+        path: |
+          e2e/cypress/screenshots
+          e2e/cypress/videos
+    
+  lint:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 8
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.x
+        cache: 'pnpm'
+    
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+    
+    - name: Run TypeScript type check
+      run: |
+        pnpm --filter frontend tsc --noEmit
+        pnpm --filter backend tsc --noEmit
+    
+    - name: Check code formatting
+      run: |
+        # 将来的にPrettierやESLintを追加する場合はここに記述
+        echo "Code formatting checks will be added here"
+  
+  build-docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build Docker image
+      run: |
+        # 将来的にDockerfileを追加した場合はここでビルド
+        echo "Docker build will be added here"
+    
+  deploy:
+    name: Deploy to Production
+    needs: [test, lint]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Deploy notification
+      run: |
+        echo "🚀 Ready to deploy to production!"
+        echo "Deployment steps would go here"

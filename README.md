@@ -1,5 +1,7 @@
 # LMS キャッチアッププロジェクト (Vue + Express + C++)
 
+[![CI/CD Pipeline](https://github.com/kimny1143/catchup-20250618vue/actions/workflows/ci.yml/badge.svg)](https://github.com/kimny1143/catchup-20250618vue/actions/workflows/ci.yml)
+
 既存のNext.js + SupabaseベースのLMSを、Vue3 + Express + C++で再実装したプロジェクトです。
 
 ## システム構成図
@@ -73,6 +75,8 @@ pnpm dev
 
 - Frontend: http://localhost:3000
 - Backend: http://localhost:4000
+- API Documentation (Swagger): http://localhost:4000/api-docs
+- OpenAPI Spec: http://localhost:4000/openapi.json
 
 ## 個別起動
 
@@ -97,7 +101,46 @@ pnpm test:e2e
 ├── packages/
 │   ├── frontend/     # Vue3アプリケーション
 │   ├── backend/      # Express APIサーバー
-│   └── addon/        # C++ Node.jsアドオン
+│   ├── addon/        # C++ Node.jsアドオン
+│   └── shared/       # 共通型定義
 ├── e2e/              # Cypressテスト
+├── docs/             # ドキュメント
 └── package.json      # monorepoルート
 ```
+
+## 主な機能
+
+### 実装済み機能 ✅
+
+1. **基本的な予約システム**
+   - レッスンスロット一覧表示
+   - スロット予約機能
+   - 予約状態のリアルタイム反映
+
+2. **高度な競合検出（C++実装）**
+   - TimeInterval構造体による時間間隔管理
+   - 重なりチェックと最小間隔チェック
+   - 60分以内の予約競合を防ぐアルゴリズム
+
+3. **APIドキュメント自動生成**
+   - Zod + zod-to-openapi による型安全なスキーマ定義
+   - Swagger UI でのインタラクティブなAPI探索
+   - OpenAPI 3.0仕様準拠
+
+4. **CI/CDパイプライン**
+   - GitHub Actions による自動テスト
+   - マルチバージョンNode.js対応（18.x, 20.x）
+   - E2Eテスト自動実行
+
+5. **ユーザー体験向上機能**
+   - Vue Toastificationによる通知システム
+   - ローカルキャッシュによるオフライン対応
+   - エラーハンドリングとフィードバック
+
+## 技術的特徴
+
+- **モノレポアーキテクチャ**: pnpm workspacesによる効率的な依存関係管理
+- **型安全性**: TypeScript + 共有型定義パッケージ
+- **パフォーマンス**: C++による計算処理の高速化
+- **テスト**: Cypress E2Eテストによる品質保証
+- **ドキュメント**: OpenAPI仕様による自動文書化
