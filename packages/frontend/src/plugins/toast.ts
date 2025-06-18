@@ -1,8 +1,8 @@
-import Toast, { PluginOptions } from 'vue-toastification'
+import Toast, { PluginOptions, POSITION } from 'vue-toastification'
 import 'vue-toastification/dist/index.css'
 
 const options: PluginOptions = {
-  position: 'top-right',
+  position: POSITION.TOP_RIGHT,
   timeout: 3000,
   closeOnClick: true,
   pauseOnFocusLoss: true,
