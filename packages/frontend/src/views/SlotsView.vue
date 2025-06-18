@@ -16,21 +16,47 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import { useToast } from 'vue-toastification'
 import LessonSlot from '../components/LessonSlot.vue'
 import type { Slot } from 'shared/types'
+import { useSlotCache } from '../composables/useSlotCache'
 
+const toast = useToast()
+const { cachedSlots, isCacheValid, updateCache, updateSlot, loadFromLocalStorage, saveToLocalStorage } = useSlotCache()
 const slots = ref<Slot[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-const fetchSlots = async () => {
+const fetchSlots = async (forceRefresh = false) => {
   try {
+    // キャッシュが有効で強制リフレッシュでない場合
+    if (isCacheValid.value && !forceRefresh) {
+      slots.value = cachedSlots.value
+      loading.value = false
+      toast.info('キャッシュからデータを読み込みました')
+      return
+    }
+
     loading.value = true
     const response = await axios.get<Slot[]>('/api/slots')
     slots.value = response.data
+    
+    // キャッシュを更新
+    updateCache(response.data)
+    saveToLocalStorage()
+    
+    if (forceRefresh) {
+      toast.success('データを更新しました')
+    }
   } catch (err) {
     error.value = 'スロットの取得に失敗しました'
     console.error(err)
+    
+    // エラー時はキャッシュから読み込み
+    if (cachedSlots.value.length > 0) {
+      slots.value = cachedSlots.value
+      toast.warning('オフラインモード: キャッシュデータを表示しています')
+    }
   } finally {
     loading.value = false
   }
@@ -42,14 +68,34 @@ const handleReserve = async (slotId: string) => {
     const index = slots.value.findIndex(s => s.id === slotId)
     if (index !== -1) {
       slots.value[index] = response.data
+      
+      // キャッシュも更新
+      updateSlot(slotId, { reserved: true })
+      saveToLocalStorage()
+      
+      // 成功トースト表示
+      toast.success(`スロット ${response.data.time} の予約が完了しました！`)
     }
-  } catch (err) {
-    alert('予約に失敗しました')
+  } catch (err: any) {
+    // エラーの種類に応じてトースト表示
+    if (err.response?.status === 400) {
+      toast.warning('このスロットは既に予約されています')
+    } else if (err.response?.status === 404) {
+      toast.error('スロットが見つかりません')
+    } else if (err.response?.status === 409) {
+      toast.error('選択した時間帯は他の予約と競合しています')
+    } else {
+      toast.error('予約に失敗しました。もう一度お試しください')
+    }
     console.error(err)
   }
 }
 
 onMounted(() => {
+  // ローカルストレージから読み込み
+  loadFromLocalStorage()
+  
+  // データを取得
   fetchSlots()
 })
 </script>
