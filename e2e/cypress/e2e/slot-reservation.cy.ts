@@ -1,13 +1,16 @@
 describe('Lesson Slot Reservation', () => {
+  // テスト前の設定
   beforeEach(() => {
     cy.visit('/')
   })
 
+  // テスト1: レッスンスロットが表示されること
   it('should display lesson slots', () => {
     cy.contains('LMS - レッスンスロット予約')
     cy.get('.lesson-slot').should('have.length.greaterThan', 0)
   })
 
+  // テスト2: 空きスロットに予約ボタンが表示されること
   it('should show reserve button for available slots', () => {
     cy.get('.lesson-slot').first().within(() => {
       cy.get('.slot-status').then(($status) => {
@@ -18,6 +21,7 @@ describe('Lesson Slot Reservation', () => {
     })
   })
 
+  // テスト3: 予約ボタンをクリックしたらスロットが予約されること
   it('should reserve a slot when clicking reserve button', () => {
     // 空きスロットを探す
     cy.get('.lesson-slot').each(($slot) => {

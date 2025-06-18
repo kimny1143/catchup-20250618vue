@@ -17,7 +17,7 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import LessonSlot from '../components/LessonSlot.vue'
-import type { Slot } from '../types/slot'
+import type { Slot } from 'shared/types'
 
 const slots = ref<Slot[]>([])
 const loading = ref(true)

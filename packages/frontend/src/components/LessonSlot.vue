@@ -17,7 +17,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Slot } from '../types/slot'
+import type { Slot } from 'shared/types'
 
 interface Props {
   slot: Slot
