@@ -23,21 +23,26 @@ describe('Lesson Slot Reservation', () => {
 
   // テスト3: 予約ボタンをクリックしたらスロットが予約されること
   it('should reserve a slot when clicking reserve button', () => {
-    // 空きスロットを探す
+    // 最初の空きスロットを見つけて予約
+    let foundAvailable = false
+    
     cy.get('.lesson-slot').each(($slot) => {
-      const status = $slot.find('.slot-status').text()
-      if (status.includes('空き')) {
+      if (!foundAvailable) {
         cy.wrap($slot).within(() => {
-          cy.get('.reserve-button').click()
+          cy.get('.slot-status').then(($status) => {
+            if ($status.text().includes('空き')) {
+              foundAvailable = true
+              
+              // 予約ボタンをクリック
+              cy.get('.reserve-button').click()
+              
+              // 予約後、ステータスが更新されるまで待つ
+              // Toastではなく、DOM要素の変化を直接確認
+              cy.get('.slot-status', { timeout: 10000 }).should('contain', '予約済み')
+              cy.get('.reserve-button').should('not.exist')
+            }
+          })
         })
-        
-        // 予約後の確認
-        cy.wrap($slot).within(() => {
-          cy.get('.slot-status').should('contain', '予約済み')
-          cy.get('.reserve-button').should('not.exist')
-        })
-        
-        return false // 最初の空きスロットで終了
       }
     })
   })
