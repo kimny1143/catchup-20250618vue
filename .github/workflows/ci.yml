@@ -31,9 +31,6 @@ jobs:
     - name: Install dependencies
       run: pnpm install --frozen-lockfile
     
-    - name: Install Cypress binary
-      run: pnpm --filter e2e cypress install
-    
     - name: Build C++ addon
       run: pnpm --filter addon build
     
@@ -63,9 +60,12 @@ jobs:
         echo $FRONTEND_PID > frontend.pid
     
     - name: Run E2E tests
-      env:
-        CYPRESS_baseUrl: http://localhost:3000
-      run: pnpm test:e2e
+      uses: cypress-io/github-action@v6
+      with:
+        working-directory: e2e
+        wait-on: 'http://localhost:3000, http://localhost:4000/api/slots'
+        wait-on-timeout: 120
+        browser: chrome
     
     - name: Stop servers
       if: always()
