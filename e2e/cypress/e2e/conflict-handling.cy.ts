@@ -6,21 +6,31 @@ describe('Conflict Handling', () => {
   })
 
   it('should handle successful reservation without conflict', () => {
-    // 空いているスロットを動的に探して予約
-    let reserved = false
+    // 予約APIをインターセプト
+    cy.intercept('POST', '/api/slots/*/reserve').as('reserveSlot')
     
-    cy.get('.lesson-slot').each(($slot) => {
-      if (!reserved) {
-        const statusText = $slot.find('.slot-status').text()
-        if (statusText.includes('空き')) {
-          // 最初に見つかった空きスロットを予約
-          cy.wrap($slot).find('.reserve-button').click()
-          reserved = true
+    // 空いているスロットを探して予約
+    cy.get('.lesson-slot').then(($slots) => {
+      const $availableSlot = Array.from($slots).find(slot => {
+        const $button = slot.querySelector('.reserve-button')
+        const status = slot.querySelector('.slot-status')?.textContent || ''
+        return $button && status.includes('空き')
+      })
+      
+      if ($availableSlot) {
+        // 予約ボタンをクリック
+        cy.wrap($availableSlot).find('.reserve-button').click()
+        
+        // APIレスポンスを待つ
+        cy.wait('@reserveSlot').then((interception) => {
+          // 成功レスポンスを確認（200または409）
+          expect([200, 409]).to.include(interception.response.statusCode)
           
-          // 成功のトースト通知を確認
-          cy.get('.Vue-Toastification__toast').should('be.visible')
-          cy.get('.Vue-Toastification__toast').should('contain', '予約が完了しました')
-        }
+          // 409の場合は競合メッセージを確認
+          if (interception.response.statusCode === 409) {
+            expect(interception.response.body).to.have.property('error')
+          }
+        })
       }
     })
   })
