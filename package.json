@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "concurrently \"pnpm --filter frontend dev\" \"pnpm --filter backend dev\"",
     "build": "pnpm -r build",
-    "test:e2e": "pnpm --filter e2e test"
+    "test:e2e": "pnpm --filter e2e test",
+    "test:e2e:json": "pnpm --filter e2e test:json"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

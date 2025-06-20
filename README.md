@@ -182,3 +182,31 @@ curl http://localhost:4000/openapi.json
 - **アーキテクチャ**: 
   - リポジトリパターンによる抽象化
   - メモリDBからSupabaseへの移行を想定した設計
+
+## Performance & Test Metrics
+
+最新のパフォーマンス計測結果：
+
+| 指標 | 値 | 条件 |
+|------|----|----|
+| **C++ 競合チェック** | p99: **4.7 ms** | 1,000 スロット × 100 ループ |
+| **E2E Tests (Cypress)** | 2 specs / **100% pass** / 15 s | GitHub Actions (ubuntu-latest, Node 20) |
+| **Backend Coverage** | Statements: **58%** | c8 + tsx |
+
+### ベンチマーク実行方法
+
+```bash
+# C++ Addon ベンチマーク
+pnpm --filter addon bench
+
+# E2E テスト（JSON レポート出力）
+pnpm test:e2e:json
+
+# Backend カバレッジ測定
+pnpm --filter backend coverage
+```
+
+### 計測環境
+- **CPU**: Apple M1 / GitHub Actions (ubuntu-latest)
+- **Node.js**: v20.x
+- **計測日**: 2025-06-20

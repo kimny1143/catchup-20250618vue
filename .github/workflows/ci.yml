@@ -137,6 +137,63 @@ jobs:
         # 将来的にDockerfileを追加した場合はここでビルド
         echo "Docker build will be added here"
     
+  benchmark:
+    name: Performance Benchmark
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install pnpm
+      uses: pnpm/action-setup@v2
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.x
+        cache: 'pnpm'
+    
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+    
+    - name: Build C++ addon
+      run: pnpm --filter addon build
+    
+    - name: Run C++ addon benchmark
+      run: pnpm --filter addon bench
+    
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-results
+        path: packages/addon/bench_result.csv
+    
+    - name: Run E2E with JSON report
+      env:
+        PORT: 4000
+        VITE_PORT: 3000
+      run: |
+        # Start servers
+        pnpm --filter backend dev &
+        pnpm --filter frontend dev &
+        
+        # Wait for servers
+        npx wait-on http://localhost:4000/api/slots http://localhost:3000 -t 30000
+        
+        # Run E2E tests with JSON output
+        pnpm test:e2e:json || true
+        
+        # Kill servers
+        pkill -f "tsx watch" || true
+    
+    - name: Upload E2E JSON report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: e2e-json-report
+        path: e2e/cypress-report.json
+  
   deploy:
     name: Deploy to Production
     needs: [test, lint]

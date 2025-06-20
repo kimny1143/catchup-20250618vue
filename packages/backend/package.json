@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "tsx watch --clear-screen=false --ignore 'node_modules/**' --ignore 'dist/**' src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "coverage": "c8 --reporter=lcov --reporter=text tsx src/index.ts",
+    "coverage:report": "c8 report --reporter=html",
+    "coverage:test": "concurrently \"c8 --reporter=lcov --reporter=text tsx src/index.ts\" \"tsx test-coverage.ts\" --kill-others --success first"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.4",
@@ -21,6 +24,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^20.11.5",
+    "c8": "^10.1.2",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   }

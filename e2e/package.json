@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "test": "cypress run",
-    "test:open": "cypress open"
+    "test:open": "cypress open",
+    "test:json": "cypress run --reporter json --reporter-options output=cypress-report.json"
   },
   "devDependencies": {
     "cypress": "^13.6.3",
