@@ -43,17 +43,20 @@ describe('Lesson Slot Reservation', () => {
         
         // APIレスポンスを待つ
         cy.wait('@reserveSlot').then((interception) => {
-          // レスポンスステータスを確認（200:成功、409:競合、400:既に予約済み）
-          expect([200, 400, 409]).to.include(interception.response.statusCode)
+          // レスポンスが存在することを確認
+          expect(interception.response).to.exist
           
-          if (interception.response.statusCode === 200) {
+          // レスポンスステータスを確認（200:成功、409:競合、400:既に予約済み）
+          expect([200, 400, 409]).to.include(interception.response!.statusCode)
+          
+          if (interception.response!.statusCode === 200) {
             // 成功した場合、UIが更新されるのを待つ
             cy.wait(500)
             // 予約済みスロットが存在することを確認
             cy.get('.slot-status:contains("予約済み")').should('exist')
           } else {
             // エラーの場合、エラーレスポンスが返されたことを確認
-            expect(interception.response.body).to.have.property('error')
+            expect(interception.response!.body).to.have.property('error')
           }
         })
       } else {

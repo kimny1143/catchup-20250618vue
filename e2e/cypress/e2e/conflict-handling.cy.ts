@@ -23,12 +23,15 @@ describe('Conflict Handling', () => {
         
         // APIレスポンスを待つ
         cy.wait('@reserveSlot').then((interception) => {
+          // レスポンスが存在することを確認
+          expect(interception.response).to.exist
+          
           // 成功レスポンスを確認（200または409）
-          expect([200, 409]).to.include(interception.response.statusCode)
+          expect([200, 409]).to.include(interception.response!.statusCode)
           
           // 409の場合は競合メッセージを確認
-          if (interception.response.statusCode === 409) {
-            expect(interception.response.body).to.have.property('error')
+          if (interception.response!.statusCode === 409) {
+            expect(interception.response!.body).to.have.property('error')
           }
         })
       }
@@ -42,7 +45,7 @@ describe('Conflict Handling', () => {
       const slots = response.body
       
       // slot-003 (13:00) が予約済みであることを確認
-      const slot003 = slots.find(s => s.id === 'slot-003')
+      const slot003 = slots.find((s: any) => s.id === 'slot-003')
       expect(slot003.reserved).to.be.true
       
       // 競合チェックAPIで13:30が競合することを確認
