@@ -1,3 +1,8 @@
+// timegm関数のためのfeature test macro
+#ifndef _WIN32
+    #define _GNU_SOURCE
+#endif
+
 #include <napi.h>
 #include <string>
 #include <vector>
@@ -6,6 +11,7 @@
 #include <iomanip>
 #include <sstream>
 #include <cmath>
+#include <ctime>
 
 // 時間間隔を表す構造体
 struct TimeInterval {
@@ -44,28 +50,67 @@ Napi::Number AnalyzeSlot(const Napi::CallbackInfo& info) {
     return Napi::Number::New(env, slotId.length());
 }
 
-// 時間文字列をタイムスタンプに変換するヘルパー関数
+// 時間文字列をタイムスタンプに変換するヘルパー関数（UTC対応）
 int64_t parseTimeString(const std::string& timeStr) {
     std::tm tm = {};
     std::istringstream ss(timeStr);
     ss >> std::get_time(&tm, "%Y-%m-%d %H:%M");
     
-    auto tp = std::chrono::system_clock::from_time_t(std::mktime(&tm));
-    return std::chrono::duration_cast<std::chrono::minutes>(tp.time_since_epoch()).count();
+    // フォーマットの妥当性チェック
+    if (ss.fail() || !ss.eof()) {
+        throw std::invalid_argument("Invalid time format. Expected: YYYY-MM-DD HH:MM");
+    }
+    
+    // UTC時間としてエポックを計算
+    time_t epoch;
+    #ifdef _WIN32
+        epoch = _mkgmtime(&tm);  // Windows用
+    #else
+        epoch = timegm(&tm);     // POSIX用（UTC換算）
+    #endif
+    
+    if (epoch == -1) {
+        throw std::invalid_argument("Failed to convert time to UTC");
+    }
+    
+    // 分単位に変換
+    return epoch / 60;
 }
 
-// isConflict関数：時間間隔の競合を高度にチェック
+// isConflict関数：時間間隔の競合を高度にチェック（O(log n)最適化版）
 bool isConflict(int64_t start, int64_t end, const std::vector<TimeInterval>& intervals, int64_t minGapMinutes = 60) {
+    if (intervals.empty()) return false;
+    
     TimeInterval newInterval(start, end, "new");
     
-    for (const auto& interval : intervals) {
+    // 開始時刻でソートされたコピーを作成
+    std::vector<TimeInterval> sorted = intervals;
+    std::sort(sorted.begin(), sorted.end(), 
+              [](const TimeInterval& a, const TimeInterval& b) {
+                  return a.start < b.start;
+              });
+    
+    // 二分探索で関連する範囲を見つける
+    // newInterval.start - minGapMinutes より前に終了する間隔は無視できる
+    auto it = std::lower_bound(sorted.begin(), sorted.end(), newInterval,
+                               [minGapMinutes](const TimeInterval& a, const TimeInterval& b) {
+                                   return a.end < b.start - minGapMinutes;
+                               });
+    
+    // 関連する間隔のみをチェック
+    for (; it != sorted.end(); ++it) {
+        // newInterval.end + minGapMinutes より後に開始する間隔は無視できる
+        if (it->start > newInterval.end + minGapMinutes) {
+            break;
+        }
+        
         // 重なりチェック
-        if (newInterval.overlaps(interval)) {
+        if (newInterval.overlaps(*it)) {
             return true;
         }
         
         // 最小間隔チェック
-        if (newInterval.distanceTo(interval) < minGapMinutes) {
+        if (newInterval.distanceTo(*it) < minGapMinutes) {
             return true;
         }
     }
@@ -87,8 +132,14 @@ Napi::Boolean CheckConflict(const Napi::CallbackInfo& info) {
     std::string newTime = info[1].As<Napi::String>().Utf8Value();
     
     // 新しい予約の時間間隔（デフォルトで60分のセッション）
-    int64_t newStart = parseTimeString(newTime);
-    int64_t newEnd = newStart + 60;  // 60分のセッション
+    int64_t newStart, newEnd;
+    try {
+        newStart = parseTimeString(newTime);
+        newEnd = newStart + 60;  // 60分のセッション
+    } catch (const std::exception& e) {
+        Napi::Error::New(env, std::string("Invalid time format: ") + e.what()).ThrowAsJavaScriptException();
+        return Napi::Boolean::New(env, false);
+    }
     
     // 既存の予約済み間隔を収集
     std::vector<TimeInterval> reservedIntervals;

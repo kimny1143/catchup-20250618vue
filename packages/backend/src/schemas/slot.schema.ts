@@ -4,10 +4,20 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi'
 // Zodを拡張してOpenAPIサポートを追加
 extendZodWithOpenApi(z)
 
+// ISO-8601形式の時間文字列検証（カスタムYYYY-MM-DD HH:MM形式）
+export const TimeISOSchema = z.string()
+  .regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/, {
+    message: 'Time must be in format YYYY-MM-DD HH:MM'
+  })
+  .openapi({ 
+    example: '2025-06-19 10:00',
+    description: 'Time in YYYY-MM-DD HH:MM format'
+  })
+
 // Slotスキーマ定義
 export const SlotSchema = z.object({
   id: z.string().openapi({ example: 'slot-001' }),
-  time: z.string().openapi({ example: '2025-06-19 10:00' }),
+  time: TimeISOSchema,
   reserved: z.boolean().openapi({ example: false })
 }).openapi('Slot')
 
@@ -18,7 +28,7 @@ export const ReserveSlotParamsSchema = z.object({
 
 // 競合チェックリクエストのスキーマ
 export const CheckConflictBodySchema = z.object({
-  time: z.string().openapi({ example: '2025-06-19 13:30' })
+  time: TimeISOSchema
 })
 
 // 競合チェックレスポンスのスキーマ

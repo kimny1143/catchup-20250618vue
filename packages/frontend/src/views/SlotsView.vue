@@ -6,6 +6,7 @@
       <LessonSlot
         v-for="slot in slots"
         :key="slot.id"
+        :ref="(el) => setSlotRef(slot.id, el)"
         :slot="slot"
         @reserve="handleReserve"
       />
@@ -62,11 +63,19 @@ const fetchSlots = async (forceRefresh = false) => {
   }
 }
 
+// 子コンポーネントのref管理（ロールバック用）
+const slotRefs = ref<Map<string, any>>(new Map())
+
 const handleReserve = async (slotId: string) => {
+  // 楽観的にUIを更新（子コンポーネントで既に実行されている）
+  const originalSlot = slots.value.find(s => s.id === slotId)
+  if (!originalSlot) return
+  
   try {
     const response = await axios.post<Slot>(`/api/slots/${slotId}/reserve`)
     const index = slots.value.findIndex(s => s.id === slotId)
     if (index !== -1) {
+      // サーバーからの応答でデータを正式に更新
       slots.value[index] = response.data
       
       // キャッシュも更新
@@ -77,6 +86,12 @@ const handleReserve = async (slotId: string) => {
       toast.success(`スロット ${response.data.time} の予約が完了しました！`)
     }
   } catch (err: any) {
+    // エラー時は楽観的更新をロールバック
+    const slotComponent = slotRefs.value.get(slotId)
+    if (slotComponent && slotComponent.rollback) {
+      slotComponent.rollback()
+    }
+    
     // エラーの種類に応じてトースト表示
     if (err.response?.status === 400) {
       toast.warning('このスロットは既に予約されています')
@@ -88,6 +103,18 @@ const handleReserve = async (slotId: string) => {
       toast.error('予約に失敗しました。もう一度お試しください')
     }
     console.error(err)
+    
+    // データを再フェッチして最新状態を取得
+    await fetchSlots(true)
+  }
+}
+
+// 子コンポーネントのrefを設定
+const setSlotRef = (slotId: string, ref: any) => {
+  if (ref) {
+    slotRefs.value.set(slotId, ref)
+  } else {
+    slotRefs.value.delete(slotId)
   }
 }
 

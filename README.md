@@ -16,8 +16,9 @@ graph TB
     
     subgraph "Backend"
         Express[Express API<br/>:4000]
-        Memory[(メモリDB<br/>Slots Data)]
+        Memory[(メモリDB<br/>Slots Data<br/>→ Supabase予定)]
         Conflict[Conflict Check<br/>API]
+        OpenAPI[OpenAPI/Swagger<br/>自動生成]
     end
     
     subgraph "Native Layer"
@@ -33,6 +34,7 @@ graph TB
     Vite -->|API Request| Express
     Express --> Memory
     Express -->|Native Call| CPP
+    Express --> OpenAPI
     Conflict --> CPP
     Cypress -->|Test| Vite
     Cypress -->|Test| Express
@@ -108,6 +110,31 @@ pnpm test:e2e
 └── package.json      # monorepoルート
 ```
 
+## API Quick Try
+
+サーバー起動後、以下のコマンドでAPIを試せます：
+
+```bash
+# 全スロット取得
+curl http://localhost:4000/api/slots
+
+# 競合チェック（13:30は13:00の予約と競合）
+curl -X POST http://localhost:4000/api/slots/check-conflict \
+  -H "Content-Type: application/json" \
+  -d '{"time": "2025-06-19 13:30"}'
+
+# スロット予約（slot-001を予約）
+curl -X POST http://localhost:4000/api/slots/slot-001/reserve
+
+# 最適スロット提案
+curl http://localhost:4000/api/slots/optimal
+
+# OpenAPI仕様を取得
+curl http://localhost:4000/openapi.json
+```
+
+ブラウザで http://localhost:4000/api-docs にアクセスすると、Swagger UIでインタラクティブにAPIを試せます。
+
 ## 主な機能
 
 ### 実装済み機能 ✅
@@ -121,6 +148,7 @@ pnpm test:e2e
    - TimeInterval構造体による時間間隔管理
    - 重なりチェックと最小間隔チェック
    - 60分以内の予約競合を防ぐアルゴリズム
+   - UTC時間処理とO(log n)最適化アルゴリズム
 
 3. **APIドキュメント自動生成**
    - Zod + zod-to-openapi による型安全なスキーマ定義
@@ -136,11 +164,21 @@ pnpm test:e2e
    - Vue Toastificationによる通知システム
    - ローカルキャッシュによるオフライン対応
    - エラーハンドリングとフィードバック
+   - 楽観的UI更新でレスポンス向上
 
 ## 技術的特徴
 
 - **モノレポアーキテクチャ**: pnpm workspacesによる効率的な依存関係管理
-- **型安全性**: TypeScript + 共有型定義パッケージ
-- **パフォーマンス**: C++による計算処理の高速化
-- **テスト**: Cypress E2Eテストによる品質保証
+- **型安全性**: TypeScript + 共有型定義パッケージ + Zodスキーマ検証
+- **パフォーマンス**: 
+  - C++による計算処理の高速化
+  - O(log n)アルゴリズムによる競合検索最適化
+  - 楽観的UI更新によるレスポンス改善
+- **品質保証**: 
+  - Cypress E2Eテストによる統合テスト
+  - Jest + Supertestによるユニットテスト
+  - マルチOS対応CI（Ubuntu/macOS）
 - **ドキュメント**: OpenAPI仕様による自動文書化
+- **アーキテクチャ**: 
+  - リポジトリパターンによる抽象化
+  - メモリDBからSupabaseへの移行を想定した設計
