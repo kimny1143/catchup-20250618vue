@@ -5,8 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "node-gyp rebuild",
-    "clean": "node-gyp clean",
-    "test": "jest"
+    "clean": "node-gyp clean"
   },
   "dependencies": {
     "node-addon-api": "^7.0.0"

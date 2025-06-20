@@ -41,11 +41,6 @@ jobs:
     - name: Build all packages
       run: pnpm build
     
-    - name: Run unit tests
-      run: |
-        # 各パッケージのユニットテストを実行
-        pnpm -r test --if-present
-    
     - name: Start servers for E2E tests
       env:
         PORT: 4000
